@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucid Remote Desktop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box }
+
+:root {
+  --bg:     #080810;
+  --text:   #e8e4ef;
+  --muted:  #b0adc0;
+  --dim:    #6b6880;
+  --surf:   rgba(255,255,255,0.03);
+  --surf2:  rgba(255,255,255,0.05);
+  --bord:   rgba(255,255,255,0.07);
+  --bord-v: rgba(139,92,246,0.18);
+  --violet: #8B7CF6;
+  --teal:   #4FD1C5;
+  --green:  #10b981;
+  --amber:  #fbbf24;
+  --red:    #ef4444;
+  --grad:   linear-gradient(135deg,#8B7CF6,#4FD1C5);
+  font-family:'Outfit',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+}
+body {
+  background:var(--bg); color:var(--text);
+  width:100vw; height:100vh; overflow:hidden;
+  user-select:none;
+}
+.step-detail, .step-info, .info-box, #overlay .card {
+  user-select:text; -webkit-user-select:text;
+}
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%,rgba(139,92,246,.08) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 60% at 70% 80%,rgba(79,209,197,.06) 0%,transparent 70%),
+    radial-gradient(ellipse 40% 40% at 50% 50%,rgba(200,100,246,.04) 0%,transparent 70%);
+}
+
+/* ── Video element ─────────────────────────────────────────────── */
+#wrap {
+  position:fixed; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  z-index:1;
+}
+#screen {
+  display:block;
+  max-width:100vw; max-height:100vh;
+  background:#000;
+  cursor:none;
+  object-fit:contain;
+}
+
+/* ── Remote cursor overlay ────────────────────────────────────── */
+#remote-cursor {
+  position:fixed;
+  left:0; top:0;
+  pointer-events:none;
+  image-rendering:pixelated;
+  transform:translate(-100px, -100px);
+  transform-origin:0 0;
+  will-change:transform;
+  z-index:60;
+  display:none;
+}
+#remote-cursor.ready { display:block }
+
+/* ── HUD ──────────────────────────────────────────────────────── */
+#hud {
+  position:fixed; top:0; left:0; right:0;
+  padding:10px 16px;
+  display:flex; align-items:center; gap:10px;
+  background:linear-gradient(180deg,rgba(8,8,16,.92) 0%,transparent 100%);
+  backdrop-filter:blur(8px);
+  z-index:100;
+  opacity:0; pointer-events:none;
+  transition:opacity .3s;
+}
+#hud.show { opacity:1; pointer-events:auto }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--dim); flex-shrink:0 }
+.dot.ok   { background:var(--green); box-shadow:0 0 8px var(--green) }
+.dot.warn { background:var(--amber); animation:blink 1s ease infinite }
+.dot.err  { background:var(--red) }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hud-title {
+  font-size:13px; font-weight:600; letter-spacing:-.02em;
+  background:var(--grad); -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent; background-clip:text;
+}
+#mon-btns { display:flex; gap:6px }
+.mon-btn {
+  padding:3px 11px; border-radius:100px;
+  border:1px solid var(--bord-v); background:var(--surf);
+  color:var(--muted); font-size:11px; font-family:inherit;
+  font-weight:500; cursor:pointer; transition:all .18s;
+}
+.mon-btn:hover  { background:rgba(139,92,246,.12); color:var(--text) }
+.mon-btn.active { background:rgba(139,92,246,.22); border-color:var(--violet); color:var(--text) }
+.spacer { flex:1 }
+#latency {
+  font-family:'Courier New',monospace; font-size:11px;
+  color:var(--teal); padding:3px 10px; border-radius:100px;
+  background:rgba(79,209,197,.08); border:1px solid rgba(79,209,197,.15);
+  min-width:62px; text-align:center; letter-spacing:.04em;
+}
+#enc-badge {
+  font-size:10px; padding:2px 8px; border-radius:100px;
+  background:rgba(139,92,246,.12); border:1px solid var(--bord-v);
+  color:var(--violet); letter-spacing:.06em; text-transform:uppercase;
+}
+.hud-btn {
+  padding:5px 9px; border-radius:8px;
+  border:1px solid var(--bord); background:var(--surf);
+  color:var(--muted); font-size:14px; cursor:pointer;
+  transition:all .18s; line-height:1;
+}
+.hud-btn:hover  { background:rgba(255,255,255,.08); color:var(--text) }
+.hud-btn.on     { background:rgba(139,92,246,.2); border-color:var(--violet); color:var(--violet) }
+
+/* ── Connect overlay ──────────────────────────────────────────── */
+#overlay {
+  position:fixed; inset:0; z-index:200;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:var(--bg);
+  transition:opacity .4s;
+  padding:20px;
+  overflow-y:auto;
+}
+#overlay.gone { opacity:0; pointer-events:none }
+.card {
+  width:min(440px,100%);
+  padding:32px 32px 28px;
+  border-radius:20px;
+  border:1px solid var(--bord-v);
+  background:rgba(255,255,255,.03);
+  backdrop-filter:blur(40px) saturate(1.5);
+}
+.header { text-align:center; margin-bottom:24px }
+.logo {
+  font-size:26px; font-weight:700; letter-spacing:-.03em;
+  background:var(--grad); -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent; background-clip:text;
+}
+.logo-sub {
+  font-size:10px; color:var(--dim); letter-spacing:.1em;
+  text-transform:uppercase; margin-top:4px;
+}
+.diag {
+  display:flex; flex-direction:column; gap:2px;
+  margin:0 0 20px;
+  border-radius:16px;
+  background:rgba(255,255,255,.02);
+  border:1px solid var(--bord);
+  padding:4px;
+}
+.step {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px; border-radius:12px;
+  font-size:13px;
+}
+.step-icon {
+  width:18px; height:18px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700;
+  background:rgba(255,255,255,.05);
+  border:1.5px solid var(--bord);
+  color:var(--dim);
+  transition:all .3s;
+}
+.step[data-state="running"] .step-icon { background:rgba(251,191,36,.15); border-color:var(--amber); color:var(--amber); animation:spin 1s linear infinite }
+.step[data-state="running"] .step-icon::after { content:'◐' }
+.step[data-state="ok"] .step-icon { background:rgba(16,185,129,.18); border-color:var(--green); color:var(--green) }
+.step[data-state="ok"] .step-icon::after { content:'✓' }
+.step[data-state="fail"] .step-icon { background:rgba(239,68,68,.18); border-color:var(--red); color:var(--red) }
+.step[data-state="fail"] .step-icon::after { content:'✕' }
+.step[data-state="skip"] .step-icon { background:rgba(255,255,255,.03); color:var(--dim); border-style:dashed }
+.step[data-state="skip"] .step-icon::after { content:'—' }
+@keyframes spin {to{transform:rotate(360deg)}}
+.step-label { flex:1; font-weight:500 }
+.step[data-state="pending"] .step-label { color:var(--dim) }
+.step-info { font-family:'Courier New',monospace; font-size:10px; color:var(--dim); white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis }
+.step[data-state="ok"]   .step-info { color:var(--teal) }
+.step[data-state="fail"] .step-info { color:var(--red) }
+.step-detail {
+  display:none;
+  margin:0 14px 8px; padding:10px 12px;
+  background:rgba(239,68,68,.06);
+  border:1px solid rgba(239,68,68,.2);
+  border-radius:10px;
+  font-family:'Courier New',monospace; font-size:10px;
+  color:#ffb4b4; white-space:pre-wrap; word-break:break-all;
+  max-height:160px; overflow-y:auto; cursor:copy;
+}
+.step[data-state="fail"] + .step-detail { display:block }
+.btn {
+  padding:12px 24px; border-radius:100px; border:none;
+  background:var(--grad); color:#fff;
+  font-size:14px; font-weight:600; font-family:inherit;
+  cursor:pointer; transition:opacity .2s,transform .15s;
+  width:100%;
+}
+.btn:hover   { opacity:.88; transform:translateY(-1px) }
+.btn:disabled { opacity:.4; cursor:not-allowed; transform:none }
+#hint {
+  position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+  padding:6px 18px; border-radius:100px;
+  background:rgba(255,255,255,.06); backdrop-filter:blur(20px);
+  border:1px solid var(--bord);
+  font-size:11px; color:var(--dim);
+  pointer-events:none; z-index:50;
+  white-space:nowrap;
+  opacity:0; transition:opacity .4s;
+}
+#hint.show { opacity:1 }
+</style>
+</head>
+<body>
+
+<!-- ── Connect overlay ────────────────────────────────────────── -->
+<div id="overlay">
+  <div class="card">
+    <div class="header">
+      <div class="logo">Lucid Remote</div>
+      <div class="logo-sub">WebRTC Edition</div>
+    </div>
+
+    <div class="diag" id="diag">
+      <div class="step" data-step="http"      data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">HTTP server reachable</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="webrtc"    data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">WebRTC available</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="mic"       data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">Microphone access</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="ws"        data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">Signaling channel</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="offer"     data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">SDP offer / answer</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="ice"       data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">ICE connection</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+
+      <div class="step" data-step="firstframe" data-state="pending">
+        <span class="step-icon"></span>
+        <span class="step-label">First video frame</span>
+        <span class="step-info"></span>
+      </div>
+      <div class="step-detail"></div>
+    </div>
+
+    <button class="btn" id="conn-btn" onclick="connect()">Connect</button>
+  </div>
+</div>
+
+<!-- ── Video + cursor overlay ─────────────────────────────────── -->
+<div id="wrap">
+  <video id="screen" autoplay playsinline muted></video>
+  <img   id="remote-cursor" alt="">
+</div>
+
+<!-- ── HUD ────────────────────────────────────────────────────── -->
+<div id="hud">
+  <div class="dot" id="dot"></div>
+  <span class="hud-title">Lucid Remote</span>
+  <div id="mon-btns"></div>
+  <span class="spacer"></span>
+  <span id="enc-badge">RTP</span>
+  <span id="latency">-- ms</span>
+  <button class="hud-btn" id="mic-btn" title="Toggle mic" onclick="toggleMic()">🎤</button>
+  <button class="hud-btn" id="fs-btn"  title="Fullscreen"  onclick="toggleFS()">⛶</button>
+  <button class="hud-btn"              title="Disconnect"   onclick="location.reload()">✕</button>
+</div>
+
+<div id="hint">Hover for controls</div>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Lucid Remote — WebRTC Edition
+// ══════════════════════════════════════════════════════════════════════════
+
+const HOST_BASE = `${location.protocol}//${location.host}`;
+const WS_SCHEME = location.protocol === 'https:' ? 'wss' : 'ws';
+const WS_URL    = `${WS_SCHEME}://${location.host}/ws`;
+
+const ICE_CONFIG = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
+// ── DOM refs ─────────────────────────────────────────────────────────────
+const video    = document.getElementById('screen');
+const overlay  = document.getElementById('overlay');
+const hud      = document.getElementById('hud');
+const dot      = document.getElementById('dot');
+const hint     = document.getElementById('hint');
+const latEl    = document.getElementById('latency');
+const monBtnsE = document.getElementById('mon-btns');
+const micBtn   = document.getElementById('mic-btn');
+const connBtn  = document.getElementById('conn-btn');
+const cursorEl = document.getElementById('remote-cursor');
+
+// ── State ────────────────────────────────────────────────────────────────
+let ws = null, pc = null, dc = null;
+let micStream = null, micOn = false;
+let monitors = [], activeMon = 0;
+let videoW = 1920, videoH = 1080;
+let cursorHotX = 0, cursorHotY = 0;
+let firstFrameSeen = false;
+let hudTimer = null;
+let pendingMonitorSwitch = null;
+
+// ── Step helpers ─────────────────────────────────────────────────────────
+function setStep(name, state, info='', detail='') {
+  const el = document.querySelector(`.step[data-step="${name}"]`);
+  if (!el) return;
+  el.dataset.state = state;
+  el.querySelector('.step-info').textContent = info;
+  const next = el.nextElementSibling;
+  if (next && next.classList.contains('step-detail')) next.textContent = detail || '';
+}
+function stepErr(name, err) {
+  console.error(`[${name}]`, err);
+  const msg = typeof err === 'string' ? err : (err?.message || 'error');
+  setStep(name, 'fail', msg.slice(0, 50),
+          typeof err === 'string' ? err : (err?.stack || msg));
+}
+
+// ── HUD ──────────────────────────────────────────────────────────────────
+function showHud() {
+  hud.classList.add('show');
+  clearTimeout(hudTimer);
+  hudTimer = setTimeout(() => {
+    if (overlay.classList.contains('gone')) hud.classList.remove('show');
+  }, 3000);
+}
+document.addEventListener('mousemove',  showHud);
+document.addEventListener('touchstart', showHud);
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Connect flow
+// ══════════════════════════════════════════════════════════════════════════
+
+async function connect() {
+  connBtn.disabled = true;
+
+  // Step 1: HTTP reachable
+  setStep('http', 'running');
+  try {
+    const t0 = performance.now();
+    const r = await fetch(`${HOST_BASE}/healthz`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    setStep('http', 'ok', `${Math.round(performance.now() - t0)}ms`);
+  } catch (e) {
+    stepErr('http', `${e.message}\n\nFirewall? Tailscale? Server not running?`);
+    connBtn.disabled = false; return;
+  }
+
+  // Step 2: WebRTC available
+  setStep('webrtc', 'running');
+  if (typeof RTCPeerConnection === 'undefined') {
+    stepErr('webrtc', 'RTCPeerConnection not in this browser');
+    connBtn.disabled = false; return;
+  }
+  setStep('webrtc', 'ok', 'RTCPeerConnection');
+
+  // Step 3: Mic
+  setStep('mic', 'running');
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    micOn = true;
+    setStep('mic', 'ok', micStream.getAudioTracks()[0]?.label?.slice(0,40) || 'mic');
+  } catch (e) {
+    setStep('mic', 'skip', 'denied — no audio passthrough');
+    micStream = null;
+  }
+
+  // Step 4: WebSocket signaling
+  setStep('ws', 'running');
+  try {
+    ws = new WebSocket(WS_URL);
+    await new Promise((res, rej) => {
+      const to = setTimeout(() => rej(new Error('timeout')), 8000);
+      ws.onopen  = () => { clearTimeout(to); res(); };
+      ws.onerror = () => { clearTimeout(to); rej(new Error('ws error')); };
+    });
+    setStep('ws', 'ok', 'open');
+  } catch (e) {
+    stepErr('ws', e.message);
+    connBtn.disabled = false; return;
+  }
+
+  ws.onmessage = onSignal;
+  ws.onclose   = () => {
+    if (overlay.classList.contains('gone')) {
+      setTimeout(() => location.reload(), 2000);
+    }
+  };
+
+  // Wait for init message before starting WebRTC
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Signaling
+// ══════════════════════════════════════════════════════════════════════════
+
+// Remote ICE candidates that arrive before setRemoteDescription() resolves
+// must be queued, otherwise addIceCandidate() throws.
+let remoteDescSet = false;
+const pendingIce  = [];
+
+async function flushPendingIce() {
+  while (pendingIce.length) {
+    const c = pendingIce.shift();
+    try { await pc.addIceCandidate(c); }
+    catch (err) { console.warn('addIceCandidate (flushed) failed:', err); }
+  }
+}
+
+async function onSignal(ev) {
+  let msg;
+  try { msg = JSON.parse(ev.data); } catch (_) { return; }
+
+  if (msg.type === 'init') {
+    monitors = msg.monitors || [];
+    videoW   = msg.width;
+    videoH   = msg.height;
+    renderMonBtns();
+    await startWebRTC();
+  } else if (msg.type === 'answer') {
+    await pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp });
+    remoteDescSet = true;
+    setStep('offer', 'ok', 'answer received');
+    await flushPendingIce();
+  } else if (msg.type === 'ice') {
+    const cand = msg.candidate;
+    if (!cand) return;
+    // cand may be { candidate, sdpMLineIndex } from webrtcbin
+    if (!remoteDescSet) {
+      pendingIce.push(cand);
+    } else {
+      try { await pc.addIceCandidate(cand); }
+      catch (err) { console.warn('addIceCandidate failed:', err, cand); }
+    }
+  } else if (msg.type === 'cursor_shape') {
+    onCursorShape(msg);
+  }
+}
+
+async function startWebRTC() {
+  setStep('offer', 'running', 'creating offer');
+
+  pc = new RTCPeerConnection(ICE_CONFIG);
+
+  // Create the data channel HERE (we are the offerer — the SCTP m-line
+  // is included in our offer SDP so the server can attach to it).
+  dc = pc.createDataChannel('input', { ordered: true });
+  dc.onopen = () => {
+    console.log('Input data channel open');
+    setupInput();
+  };
+  dc.onclose = () => console.log('Input data channel closed');
+
+  // Recvonly video transceiver so the offer asks for video
+  pc.addTransceiver('video', { direction: 'recvonly' });
+
+  // Add mic audio if available
+  if (micStream) {
+    micStream.getTracks().forEach(t => pc.addTrack(t, micStream));
+  }
+
+  // Receive video track from server
+  pc.ontrack = (e) => {
+    if (e.track.kind === 'video') {
+      console.log('Got video track');
+
+      // Low-latency jitter buffer.
+      // 50ms is the sweet spot per Chrome WebRTC team — 0 causes stutter.
+      // Research report Finding 5: Chrome inflates its buffer in response
+      // to bursts; 50ms hint tells it to hold still.
+      const receiver = e.receiver;
+      try {
+        if ('jitterBufferTarget' in receiver) {
+          receiver.jitterBufferTarget = 50;          // ms (Chrome 107+)
+          console.log('jitterBufferTarget = 50ms');
+        } else if ('playoutDelayHint' in receiver) {
+          receiver.playoutDelayHint = 0.05;           // seconds (legacy)
+          console.log('playoutDelayHint = 50ms (legacy)');
+        }
+      } catch (err) {
+        console.warn('jitter buffer hint failed:', err);
+      }
+
+      video.srcObject = e.streams[0];
+    }
+  };
+
+  // ICE state
+  pc.oniceconnectionstatechange = () => {
+    const st = pc.iceConnectionState;
+    console.log('ICE state:', st);
+    if (st === 'checking') setStep('ice', 'running', 'checking');
+    else if (st === 'connected' || st === 'completed') setStep('ice', 'ok', st);
+    else if (st === 'failed') stepErr('ice', 'ICE failed');
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') {
+      dot.className = 'dot ok';
+    } else if (['failed','disconnected'].includes(pc.connectionState)) {
+      dot.className = 'dot err';
+    }
+  };
+
+  // Detect first frame via video element event
+  video.addEventListener('playing', onFirstFrame, { once: true });
+  video.addEventListener('loadeddata', onFirstFrame, { once: true });
+
+  // Create offer
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  // Wait for ICE gathering (simpler than trickle on the client side too)
+  if (pc.iceGatheringState !== 'complete') {
+    await new Promise(resolve => {
+      const check = () => { if (pc.iceGatheringState === 'complete') resolve(); };
+      pc.addEventListener('icegatheringstatechange', check);
+      setTimeout(resolve, 5000);
+    });
+  }
+
+  ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription.sdp }));
+  setStep('offer', 'running', 'sent, awaiting answer');
+}
+
+function onFirstFrame() {
+  if (firstFrameSeen) return;
+  firstFrameSeen = true;
+  setStep('firstframe', 'ok', `${video.videoWidth}×${video.videoHeight}`);
+  setTimeout(() => {
+    overlay.classList.add('gone');
+    hint.classList.add('show');
+    showHud();
+    startLatencyLoop();
+    startStatsLoop();
+  }, 200);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Cursor overlay
+// ══════════════════════════════════════════════════════════════════════════
+
+function onCursorShape(msg) {
+  const { w, h, hx, hy, bgra } = msg;
+  cursorHotX = hx; cursorHotY = hy;
+
+  const bytes = Uint8Array.from(atob(bgra), c => c.charCodeAt(0));
+  const rgba  = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    rgba[i*4 + 0] = bytes[i*4 + 2];
+    rgba[i*4 + 1] = bytes[i*4 + 1];
+    rgba[i*4 + 2] = bytes[i*4 + 0];
+    rgba[i*4 + 3] = bytes[i*4 + 3];
+  }
+  const off = new OffscreenCanvas(w, h);
+  off.getContext('2d').putImageData(new ImageData(rgba, w, h), 0, 0);
+  off.convertToBlob({ type:'image/png' }).then(blob => {
+    const prev = cursorEl.src;
+    cursorEl.src = URL.createObjectURL(blob);
+    cursorEl.style.width  = w + 'px';
+    cursorEl.style.height = h + 'px';
+    cursorEl.classList.add('ready');
+    if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+  });
+}
+
+function moveCursorTo(clientX, clientY) {
+  const r = video.getBoundingClientRect();
+  const scale = r.width / (video.videoWidth || videoW);
+  cursorEl.style.transform =
+    `translate(${clientX - cursorHotX * scale}px, ${clientY - cursorHotY * scale}px) scale(${scale})`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Input capture
+// ══════════════════════════════════════════════════════════════════════════
+
+function setupInput() {
+  video.tabIndex = 0;
+  video.focus({ preventScroll: true });
+
+  video.addEventListener('mousemove', e => {
+    moveCursorTo(e.clientX, e.clientY);
+    const [x, y] = normPos(e.clientX, e.clientY);
+    if (x !== null) sendDC({ type:'mousemove', x, y });
+  });
+  video.addEventListener('mousedown', e => {
+    e.preventDefault();
+    video.focus({ preventScroll: true });
+    moveCursorTo(e.clientX, e.clientY);
+    const [x, y] = normPos(e.clientX, e.clientY);
+    if (x !== null) sendDC({ type:'mousemove', x, y });
+    sendDC({ type:'mousedown', button: e.button });
+  });
+  video.addEventListener('mouseup', e =>
+    sendDC({ type:'mouseup', button: e.button }));
+  video.addEventListener('contextmenu', e => e.preventDefault());
+  video.addEventListener('wheel', e => {
+    e.preventDefault();
+    sendDC({ type:'wheel', deltaX: e.deltaX, deltaY: e.deltaY });
+  }, { passive: false });
+
+  document.addEventListener('keydown', e => {
+    if (!overlay.classList.contains('gone')) return;
+    if (e.ctrlKey && ['w','W','Tab'].includes(e.key)) return;
+    sendDC({ type:'keydown', code: e.code, key: e.key });
+    e.preventDefault();
+  });
+  document.addEventListener('keyup', e => {
+    if (!overlay.classList.contains('gone')) return;
+    if (e.ctrlKey && ['w','W','Tab'].includes(e.key)) return;
+    sendDC({ type:'keyup', code: e.code, key: e.key });
+    e.preventDefault();
+  });
+}
+
+function normPos(cx, cy) {
+  const r = video.getBoundingClientRect();
+  // Account for object-fit: contain letterboxing
+  const va = video.videoWidth / video.videoHeight;
+  const ea = r.width / r.height;
+  let vL, vT, vW, vH;
+  if (va > ea) { vW = r.width;  vH = r.width  / va; vL = r.left; vT = r.top + (r.height - vH) / 2; }
+  else         { vH = r.height; vW = r.height * va; vT = r.top;  vL = r.left + (r.width  - vW) / 2; }
+  const nx = (cx - vL) / vW;
+  const ny = (cy - vT) / vH;
+  if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return [null, null];
+  return [nx, ny];
+}
+
+function sendDC(obj) {
+  if (dc && dc.readyState === 'open') dc.send(JSON.stringify(obj));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Monitor switcher
+// ══════════════════════════════════════════════════════════════════════════
+
+function renderMonBtns() {
+  monBtnsE.innerHTML = '';
+  monitors.forEach((m, i) => {
+    const b = document.createElement('button');
+    b.className = 'mon-btn' + (i === activeMon ? ' active' : '');
+    b.textContent = `🖥 ${m.width}×${m.height}`;
+    b.onclick = () => {
+      activeMon = i;
+      document.querySelectorAll('.mon-btn').forEach((el, j) => el.classList.toggle('active', j === i));
+      sendDC({ type:'switch_monitor', index: i });
+    };
+    monBtnsE.appendChild(b);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Mic toggle, fullscreen
+// ══════════════════════════════════════════════════════════════════════════
+
+function toggleMic() {
+  micOn = !micOn;
+  if (micStream) micStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  micBtn.classList.toggle('on', micOn);
+}
+
+function toggleFS() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//   Latency display + WebRTC stats
+// ══════════════════════════════════════════════════════════════════════════
+
+function startLatencyLoop() {
+  // HTTP RTT — separate TCP socket, true network latency
+  setInterval(async () => {
+    const t0 = performance.now();
+    try {
+      const r = await fetch(`${HOST_BASE}/healthz`, { cache: 'no-store' });
+      if (!r.ok) return;
+      await r.text();
+      const rtt = Math.round(performance.now() - t0);
+      latEl.textContent = rtt + ' ms';
+      latEl.style.color = rtt < 30 ? '#10b981' : rtt < 80 ? '#4FD1C5' : '#fbbf24';
+    } catch (_) {}
+  }, 1500);
+}
+
+function startStatsLoop() {
+  // Pull WebRTC stats every 2s — RTT + jitter from the actual RTP stream
+  setInterval(async () => {
+    if (!pc) return;
+    try {
+      const stats = await pc.getStats();
+      let rtt = null, jitter = null, fps = null, codec = null;
+      stats.forEach(s => {
+        if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.currentRoundTripTime != null) {
+          rtt = Math.round(s.currentRoundTripTime * 1000);
+        }
+        if (s.type === 'inbound-rtp' && s.kind === 'video') {
+          jitter = s.jitter;
+          fps = s.framesPerSecond;
+        }
+      });
+      if (rtt !== null) {
+        const txt = fps != null ? `${rtt}ms · ${Math.round(fps)}fps` : rtt + 'ms';
+        latEl.textContent = txt;
+        latEl.style.color = rtt < 30 ? '#10b981' : rtt < 80 ? '#4FD1C5' : '#fbbf24';
+      }
+    } catch (_) {}
+  }, 2000);
+}
+</script>
+</body>
+</html>
