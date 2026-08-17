@@ -105,4 +105,4 @@ This is a working prototype that I use, not a finished product. Being specific a
 
 ## License
 
-MIT. See `LICENSE`.
+Apache 2.0. See `LICENSE` and `NOTICE`.
