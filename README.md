@@ -101,6 +101,8 @@ This is a working prototype that I use, not a finished product. Being specific a
 - **Monitor switching tears down and rebuilds the capture device**, which stalls the aiortc path visibly for a moment.
 - **No tests.** Diagnosis was done with the `/diag` endpoint, the timing counters in `ScreenCaptureTrack.timing_report()` and reading server logs.
 
+[`WRITEUP-756MS.md`](WRITEUP-756MS.md) is the full account of the pacer, written for someone who has not read this repo.
+
 `RESEARCH-BRIEF.md` is the write-up of the latency problem as it stood before the fixes above, including the hypotheses that turned out to be wrong. It is kept because the wrong ones are the useful part.
 
 ## License
