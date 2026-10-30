@@ -1,5 +1,7 @@
 # Fifty sleeps of 3.2 ms took 756 ms, and that is why I deleted my RTP pacer
 
+**Correction, 30 October 2026.** An earlier version of this essay said aiortc cuts H.264 keyframes at fixed 1200-byte offsets. That was my error: aiortc splits on NAL start codes, and the section is rewritten below. Also corrected: where aiortc runs the encode, the keyframe size behind the 750 ms lockout, and two before-the-pacer baselines that had no measurement behind them.
+
 I built a self-hosted remote desktop for Windows that streams the screen to a browser tab over WebRTC. It works. The part worth writing down is a fix I was confident about, shipped, measured, and then removed.
 
 ## The symptom
@@ -10,9 +12,9 @@ Two instruments disagreeing by three orders of magnitude usually means one of th
 
 ## The hypothesis that was right
 
-aiortc encodes H.264 synchronously inside the same asyncio event loop that runs ICE, DTLS, RTP send and the input data channel. It also ships no RTP send pacer. That is confirmed in aiortc discussion #965 and visible by reading `rtcrtpsender.py`: packets for a frame leave in a tight `for` loop with nothing between them.
+aiortc ships no RTP send pacer. The encode itself runs on a worker thread, but the packets of each frame come back to the same asyncio event loop that runs ICE, DTLS and the input data channel, and leave there in a tight `for` loop of synchronous sends with nothing between them. That is confirmed in aiortc discussion #965 and visible by reading `rtcrtpsender.py`.
 
-A keyframe at 3 Mbps is 150 or more RTP packets. Emitting 150 packets back to back inside the event loop starves ICE heartbeats for the duration. Starved heartbeats explain a 7-second RTT reading much better than a 2 ms network does.
+A keyframe at 3 Mbps is around 50 RTP packets at the GOP this host ships. Emitting them back to back inside the event loop can starve ICE heartbeats for the duration. Starved heartbeats explain a 7-second RTT reading much better than a 2 ms network does.
 
 So far so good. The diagnosis held up.
 
@@ -20,9 +22,9 @@ So far so good. The diagnosis held up.
 
 I wrote a leaky-bucket pacer. One `asyncio.sleep(9600 / bitrate)` between packets, which at 3 Mbps is about 3.2 ms. Standard approach, roughly what libwebrtc does.
 
-Delivered frame rate fell from a bad 8 fps to a much worse 2 or 3 fps. Keyframes stalled for most of a second. Per-frame `pipeline_gap` climbed from 70 ms to somewhere between 222 and 504 ms.
+By the notes I left in the code at the time, delivered frame rate collapsed to 2 or 3 fps, keyframes stalled for most of a second, and per-frame `pipeline_gap` sat somewhere between 222 and 504 ms. No log from those runs survives.
 
-I had made the thing I was fixing about five times worse.
+I had made the thing I was fixing worse.
 
 ## What was actually happening
 
@@ -34,13 +36,13 @@ I timed it directly rather than reasoning about it:
 fifty consecutive asyncio.sleep(3.2ms) calls -> 756.7 ms of wall clock
 ```
 
-Fifty sleeps that should have cost 160 ms cost 756.7 ms. A 150-packet keyframe was therefore locked out of the send path for roughly three quarters of a second, every single time a keyframe went out.
+Fifty sleeps that should have cost 160 ms cost 756.7 ms. A 50-packet keyframe was therefore locked out of the send path for roughly three quarters of a second, every single time a keyframe went out.
 
 The pacer was solving a congested-WAN problem that a 2 ms tailnet link does not have, and paying for it with a Windows timer bill I had not measured.
 
 ## What replaced it
 
-`install_send_pacer()` is now a documented no-op. It keeps exactly one line of the original implementation:
+`install_send_pacer()` is now a documented no-op. The one thing it still does is this:
 
 ```python
 winmm.timeBeginPeriod(1)
@@ -50,13 +52,13 @@ That single call drops system timer granularity from 15.6 ms to 1 ms process-wid
 
 The keyframe burst problem got solved the boring way instead, by raising GOP from 60 to 120 frames. Half as many keyframes, half as many bursts.
 
-## The other bug, which was a real bug
+## The other bug, which was not a bug
 
-While in there I found something that was unambiguously broken. aiortc fragments the H.264 bitstream at fixed 1200-byte offsets without looking for NAL start codes. A keyframe carrying SPS, PPS and an IDR slice together gets cut mid-NAL and arrives corrupt.
+While in there I convinced myself that aiortc fragments the H.264 bitstream at fixed 1200-byte offsets, so a keyframe carrying SPS, PPS and an IDR slice would be cut mid-NAL and arrive corrupt. I wrote `_nal_aware_split_bitstream` to cut on Annex-B start codes first and leave MTU fragmentation to FU-A.
 
-The browser responds to a corrupt keyframe with a PLI. The encoder produces another keyframe. That one gets fragmented identically and corrupts identically. It is a stable loop that looks like a network problem and is not one.
+That belief was wrong. aiortc has split on start codes since at least version 0.9.10 in 2018, and so does the 1.14.0 this project runs. Fed a keyframe of a 25-byte SPS, a 5-byte PPS and a 120,000-byte IDR slice, aiortc's own splitter keeps all three NALs whole, and they rebuild byte for byte from its 94 RTP packets. My splitter produces the same three pieces. The patch changes nothing.
 
-`_nal_aware_split_bitstream` cuts on Annex-B start codes first and leaves MTU fragmentation to FU-A, where it belongs.
+It is the pacer lesson again, one size smaller: a fix written from a confident reading, never checked against the code it was fixing.
 
 I also swapped libx264 for `h264_nvenc` with `preset=p1`, `tune=ull`, `rc-lookahead=0`, `surfaces=2`. Measured in isolation, that encodes a 1080p frame in 10.8 ms.
 

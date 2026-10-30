@@ -133,10 +133,10 @@ def apply_nvenc_patch() -> bool:
     H264Encoder._encode_frame = _patched_encode_frame
 
     # ── Patch _split_bitstream to respect NAL unit boundaries ─────────────
-    # aiortc's default splits H.264 bytes at 1200-byte chunks regardless of
-    # where NAL units start (aiortc issue #1082). This corrupts large
-    # keyframes that contain multiple NAL units (SPS+PPS+IDR slice), causing
-    # the browser to request PLI → new keyframe → corrupt again → loop.
+    # Written on the belief that aiortc split H.264 at fixed 1200-byte chunks.
+    # It does not: aiortc 1.14.0 already splits on Annex-B start codes, and
+    # this replacement produces the same pieces (checked 2026-10-30). Kept
+    # because it is harmless; removing it changes nothing.
     #
     # Fix: always split on NAL unit boundaries first, then fragment each NAL
     # into MTU-sized pieces using FU-A (which is NAL-aware).
@@ -164,7 +164,7 @@ def apply_nvenc_patch() -> bool:
 
     H264Encoder._split_bitstream = _nal_aware_split_bitstream
 
-    logger.info("H264Encoder._split_bitstream patched → NAL-aware (fixes keyframe corruption)")
+    logger.info("H264Encoder._split_bitstream patched → NAL-aware (same cuts as the aiortc splitter, changes nothing)")
 
     # ── Lock target_bitrate: prevent aiortc's broken BWE from churning NVENC ──
     _orig_init = H264Encoder.__init__
