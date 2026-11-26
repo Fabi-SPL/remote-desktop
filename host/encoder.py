@@ -24,7 +24,7 @@ import numpy as np
 from aiortc import VideoStreamTrack
 from av     import VideoFrame
 
-logger = logging.getLogger("lucid-remote.encoder")
+logger = logging.getLogger("keled-remote.encoder")
 
 VIDEO_CLOCK_RATE = 90000
 VIDEO_TIME_BASE  = fractions.Fraction(1, VIDEO_CLOCK_RATE)
@@ -131,7 +131,7 @@ class ScreenCaptureTrack(VideoStreamTrack):
         self._capture_thread = threading.Thread(
             target=self._capture_loop,
             daemon=True,
-            name="lucid-capture",
+            name="keled-capture",
         )
         self._capture_thread.start()
 

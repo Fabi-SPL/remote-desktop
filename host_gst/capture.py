@@ -10,7 +10,7 @@ import ctypes
 import ctypes.wintypes
 import logging
 
-logger = logging.getLogger("lucid-remote.capture")
+logger = logging.getLogger("keled-remote.capture")
 
 
 def get_monitor_list() -> list[dict]:

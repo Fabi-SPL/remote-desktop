@@ -1,5 +1,5 @@
 @echo off
-title Lucid Remote Desktop -- Install Autostart
+title Keled Remote Desktop -- Install Autostart
 
 REM ── Self-elevate to admin ──────────────────────────────────────────────
 net session >nul 2>&1
@@ -12,7 +12,7 @@ if %errorlevel% neq 0 (
 cd /d "%~dp0"
 
 echo.
-echo  Lucid Remote Desktop -- Autostart Installer
+echo  Keled Remote Desktop -- Autostart Installer
 echo  ===========================================
 echo.
 echo  This will:
@@ -32,8 +32,8 @@ set VBS=%~dp0start-hidden.vbs
 echo  [+] Created %VBS%
 
 REM ── Register scheduled task ────────────────────────────────────────────
-schtasks /Delete /TN "LucidRemoteDesktop" /F >nul 2>&1
-schtasks /Create /TN "LucidRemoteDesktop" ^
+schtasks /Delete /TN "KeledRemoteDesktop" /F >nul 2>&1
+schtasks /Create /TN "KeledRemoteDesktop" ^
   /TR "wscript.exe \"%VBS%\"" ^
   /SC ONLOGON ^
   /RL HIGHEST ^
@@ -46,12 +46,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo  [+] Registered task LucidRemoteDesktop  (runs at logon, highest privileges)
+echo  [+] Registered task KeledRemoteDesktop  (runs at logon, highest privileges)
 echo.
 echo  Done. Test it now:
-echo     schtasks /Run /TN LucidRemoteDesktop
+echo     schtasks /Run /TN KeledRemoteDesktop
 echo.
-echo  Then visit  https://%LUCID_REMOTE_HOST%:8080  from your client device.
-echo  (set LUCID_REMOTE_HOST first, or read the IP the server prints at startup)
+echo  Then visit  https://%KELED_REMOTE_HOST%:8080  from your client device.
+echo  (set KELED_REMOTE_HOST first, or read the IP the server prints at startup)
 echo.
 pause

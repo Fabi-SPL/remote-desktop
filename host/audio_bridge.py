@@ -14,7 +14,7 @@ import asyncio
 import logging
 import numpy as np
 
-logger = logging.getLogger("lucid-remote.audio")
+logger = logging.getLogger("keled-remote.audio")
 
 DEFAULT_DEVICE = "CABLE Input"
 DEFAULT_RATE   = 48000

@@ -27,7 +27,7 @@ import av
 import aiortc.codecs.h264 as _h264
 from aiortc.codecs.h264 import H264Encoder, MAX_FRAME_RATE
 
-logger = logging.getLogger("lucid-remote.nvenc")
+logger = logging.getLogger("keled-remote.nvenc")
 
 _NVENC_TESTED = False
 _NVENC_WORKS  = False

@@ -1,12 +1,12 @@
 @echo off
-title Lucid Remote Desktop -- Uninstall Autostart
+title Keled Remote Desktop -- Uninstall Autostart
 cd /d "%~dp0"
 
 echo.
-echo  Removing Lucid Remote Desktop autostart...
+echo  Removing Keled Remote Desktop autostart...
 echo.
 
-set TASKNAME=LucidRemoteDesktop
+set TASKNAME=KeledRemoteDesktop
 
 schtasks /End    /TN "%TASKNAME%" 2>nul
 schtasks /Delete /TN "%TASKNAME%" /F

@@ -9,7 +9,7 @@ import ctypes
 import ctypes.wintypes
 import logging
 
-logger = logging.getLogger("lucid-remote.input")
+logger = logging.getLogger("keled-remote.input")
 
 user32 = ctypes.windll.user32
 

@@ -1,5 +1,5 @@
 """
-Lucid Remote Desktop — Host Server (GStreamer / webrtcbin edition)
+Keled Remote Desktop — Host Server (GStreamer / webrtcbin edition)
 ===================================================================
 Drop-in replacement for host/server.py.  Runs under Python 3.9 +
 GStreamer 1.28 (MSVC x86_64).
@@ -61,8 +61,8 @@ from gst_pipeline   import (
 
 CLIENT_DIR = Path(__file__).parent.parent / "client"
 CERT_DIR   = Path(__file__).parent.parent / "certs"
-CERT_FILE  = CERT_DIR / "lucid.crt"
-KEY_FILE   = CERT_DIR / "lucid.key"
+CERT_FILE  = CERT_DIR / "keled.crt"
+KEY_FILE   = CERT_DIR / "keled.key"
 START_TIME = time.time()
 
 
@@ -111,7 +111,7 @@ class ColorFormatter(logging.Formatter):
 
 def log(level: str, cat: str, msg: str):
     eventlog.add(level, cat, msg)
-    record = logging.LogRecord("lucid", getattr(logging, level, logging.INFO),
+    record = logging.LogRecord("keled", getattr(logging, level, logging.INFO),
                                 "", 0, msg, None, None)
     record.cat = cat
     _handler.emit(record)
@@ -172,7 +172,7 @@ def ensure_self_signed_cert():
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "Lucid Remote Desktop"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "Keled Remote Desktop"),
     ])
     cert = (x509.CertificateBuilder()
             .subject_name(subject).issuer_name(issuer)
@@ -543,7 +543,7 @@ def main():
     ts_ip = pre.get("tailscale_ip") or "?"
     print()
     print("  ┌" + "─" * 56 + "┐")
-    print(f"  │  Lucid Remote Desktop — GStreamer edition (v3)         │")
+    print(f"  │  Keled Remote Desktop — GStreamer edition (v3)         │")
     print(f"  │  Local      →  {scheme}://localhost:{args.port}")
     print(f"  │  Tailscale  →  {scheme}://{ts_ip}:{args.port}")
     print(f"  │  Transport  →  WebRTC RTP/UDP (webrtcbin + NVENC)")

@@ -38,7 +38,7 @@ gi.require_version("GstSdp", "1.0")
 gi.require_version("GstWebRTC", "1.0")
 from gi.repository import GLib, Gst, GstSdp, GstWebRTC  # noqa: E402
 
-logger = logging.getLogger("lucid-remote.gst")
+logger = logging.getLogger("keled-remote.gst")
 
 # ─── Tunables (same ballpark as nvenc_patch.py) ───────────────────────────
 FPS_DEFAULT        = 30

@@ -1,5 +1,5 @@
 """
-Lucid Remote Desktop — Host Server (WebRTC / aiortc edition)
+Keled Remote Desktop — Host Server (WebRTC / aiortc edition)
 ==============================================================
 Architecture:
   Video  → ScreenCaptureTrack → aiortc → H.264 RTP / UDP → WebRTC
@@ -70,8 +70,8 @@ from nvenc_patch    import apply_nvenc_patch, install_send_pacer
 
 CLIENT_DIR = Path(__file__).parent.parent / "client"
 CERT_DIR   = Path(__file__).parent.parent / "certs"
-CERT_FILE  = CERT_DIR / "lucid.crt"
-KEY_FILE   = CERT_DIR / "lucid.key"
+CERT_FILE  = CERT_DIR / "keled.crt"
+KEY_FILE   = CERT_DIR / "keled.key"
 START_TIME = time.time()
 
 
@@ -120,7 +120,7 @@ class ColorFormatter(logging.Formatter):
 
 def log(level: str, cat: str, msg: str):
     eventlog.add(level, cat, msg)
-    record = logging.LogRecord("lucid", getattr(logging, level, logging.INFO),
+    record = logging.LogRecord("keled", getattr(logging, level, logging.INFO),
                                 "", 0, msg, None, None)
     record.cat = cat
     _handler.emit(record)
@@ -184,7 +184,7 @@ def ensure_self_signed_cert():
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "Lucid Remote Desktop"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "Keled Remote Desktop"),
     ])
     cert = (x509.CertificateBuilder()
             .subject_name(subject).issuer_name(issuer)
@@ -563,7 +563,7 @@ def main():
     ts_ip = pre.get("tailscale_ip") or "?"
     print()
     print("  ┌" + "─" * 56 + "┐")
-    print(f"  │  Lucid Remote Desktop — WebRTC edition                 │")
+    print(f"  │  Keled Remote Desktop — WebRTC edition                 │")
     print(f"  │  Local      →  {scheme}://localhost:{args.port}")
     print(f"  │  Tailscale  →  {scheme}://{ts_ip}:{args.port}")
     print(f"  │  Transport  →  WebRTC RTP/UDP")

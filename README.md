@@ -79,7 +79,7 @@ Flags and environment:
 venv\Scripts\python host\server.py --port 8080 --fps 30
 venv\Scripts\python host\server.py --no-https        REM plain HTTP, breaks mic capture
 set PORT=9000                                        REM default port, read by argparse
-set LUCID_REMOTE_HOST=my-host.tailnet.ts.net         REM display only, used by the .bat banners
+set KELED_REMOTE_HOST=my-host.tailnet.ts.net         REM display only, used by the .bat banners
 ```
 
 Microphone passthrough needs [VB-Cable](https://vb-audio.com/Cable/) installed, so that the host has a `CABLE Input` playback device to write the browser's audio into. Everything else works without it. `install-autostart.bat` registers a logon Task Scheduler entry if you want the host running headless, and `uninstall-autostart.bat` removes it.

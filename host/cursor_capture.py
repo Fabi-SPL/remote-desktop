@@ -16,7 +16,7 @@ import logging
 
 import numpy as np
 
-logger = logging.getLogger("lucid-remote.cursor")
+logger = logging.getLogger("keled-remote.cursor")
 
 # ── Win32 constants ─────────────────────────────────────────────────────────
 CURSOR_SHOWING  = 0x00000001

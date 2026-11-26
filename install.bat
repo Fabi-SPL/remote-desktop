@@ -1,9 +1,9 @@
 @echo off
-title Lucid Remote Desktop -- Install
+title Keled Remote Desktop -- Install
 cd /d "%~dp0"
 
 echo.
-echo  Lucid Remote Desktop -- First-time Setup
+echo  Keled Remote Desktop -- First-time Setup
 echo  ==========================================
 echo.
 
